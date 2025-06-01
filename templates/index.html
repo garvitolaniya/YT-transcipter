@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Transcript Viewer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .chunk {
+            margin-bottom: 2rem;
+            padding: 1rem;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+        }
+        .timestamp {
+            color: #0d6efd;
+            font-weight: bold;
+        }
+        .video-info {
+            background-color: #e9ecef;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+        .transcript-text {
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+        #searchInput {
+            margin-bottom: 1rem;
+        }
+        .view-toggle {
+            margin-bottom: 1rem;
+        }
+        .full-transcript {
+            background-color: #f8f9fa;
+            padding: 2rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+        .chunked-transcript {
+            display: none;
+        }
+        .nav-tabs {
+            margin-bottom: 1rem;
+        }
+        .full-transcript .transcript-text {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            text-align: justify;
+            max-width: 900px;
+            margin: 0 auto;
+            white-space: normal;
+        }
+        mark {
+            background-color: #ffd700;
+            padding: 0 2px;
+            border-radius: 2px;
+        }
+        .transcript-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            align-items: center;
+        }
+        .font-size-control {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .font-size-control button {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <h1 class="mb-4">YouTube Transcript Viewer</h1>
+        
+        <div class="row mb-4">
+            <div class="col">
+                <form method="POST" class="d-flex gap-2" id="mainForm">
+                    <input type="text" name="url" class="form-control" placeholder="Enter YouTube URL" required id="urlInput" value="{{ result.video_url if result else '' }}">
+                    <input type="hidden" name="display_lang" id="displayLangInput" value="en">
+                    <button type="submit" class="btn btn-primary">Get Transcript</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="transcriptSection">
+            <!-- The transcript will be rendered here by AJAX or after form submission. -->
+        </div>
+
+        {% if error %}
+        <div class="alert alert-danger" role="alert">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        {% if result %}
+        <div class="video-info">
+            <h2>{{ result.video_title }}</h2>
+            <p class="mb-1"><strong>Duration:</strong> {{ result.duration }}</p>
+            <p class="mb-1"><strong>URL:</strong> <a href="{{ result.video_url }}" target="_blank">{{ result.video_url }}</a></p>
+            <p class="mb-0"><strong>Number of chunks:</strong> {{ result.chunks|length }}</p>
+        </div>
+
+        <div class="transcript-controls">
+            <div class="flex-grow-1">
+                <input type="text" id="searchInput" class="form-control" placeholder="Search in transcript...">
+            </div>
+            <div class="font-size-control">
+                <button class="btn btn-outline-secondary btn-sm" onclick="changeFontSize(-1)">A-</button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="changeFontSize(1)">A+</button>
+            </div>
+        </div>
+
+        <ul class="nav nav-tabs" id="viewTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="full-tab" data-bs-toggle="tab" data-bs-target="#full" type="button" role="tab">Full Transcript</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="chunked-tab" data-bs-toggle="tab" data-bs-target="#chunked" type="button" role="tab">Time-based Chunks</button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="viewTabsContent">
+            <div class="tab-pane fade show active" id="full" role="tabpanel">
+                <div class="full-transcript">
+                    <h3>Full Transcript</h3>
+                    <div class="transcript-text" id="fullTranscript">
+                        {% set full_text = result.chunks | map(attribute='text') | join(' ') %}
+                        {{ full_text | replace('\n', ' ') | replace('\r', '') }}
+                    </div>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="chunked" role="tabpanel">
+                <div class="chunked-transcript">
+                    <h3>Time-based Chunks</h3>
+                    <div id="transcriptContainer">
+                        {% for chunk in result.chunks %}
+                        <div class="chunk" data-text="{{ chunk.text|lower }}">
+                            <div class="timestamp">
+                                [{{ chunk.start_time }} - {{ chunk.end_time }}]
+                            </div>
+                            <div class="transcript-text">
+                                {{ chunk.text }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentFontSize = 1.1; // Initial font size in rem
+
+        function changeFontSize(delta) {
+            currentFontSize = Math.max(0.8, Math.min(1.5, currentFontSize + delta * 0.1));
+            document.querySelector('.full-transcript .transcript-text').style.fontSize = `${currentFontSize}rem`;
+        }
+
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            const searchText = e.target.value.toLowerCase();
+            const chunks = document.querySelectorAll('.chunk');
+            const fullTranscript = document.getElementById('fullTranscript');
+            
+            // Search in chunks
+            chunks.forEach(chunk => {
+                const text = chunk.getAttribute('data-text');
+                if (text.includes(searchText)) {
+                    chunk.style.display = 'block';
+                    if (searchText) {
+                        const regex = new RegExp(searchText, 'gi');
+                        chunk.innerHTML = chunk.innerHTML.replace(regex, match => `<mark>${match}</mark>`);
+                    }
+                } else {
+                    chunk.style.display = 'none';
+                }
+            });
+
+            // Search in full transcript
+            if (searchText) {
+                const text = fullTranscript.textContent;
+                const regex = new RegExp(searchText, 'gi');
+                fullTranscript.innerHTML = text.replace(regex, match => `<mark>${match}</mark>`);
+            } else {
+                fullTranscript.innerHTML = fullTranscript.textContent;
+            }
+        });
+
+        // Show/hide chunked transcript when tab is clicked
+        document.getElementById('chunked-tab').addEventListener('click', function() {
+            document.querySelector('.chunked-transcript').style.display = 'block';
+        });
+
+        document.getElementById('full-tab').addEventListener('click', function() {
+            document.querySelector('.chunked-transcript').style.display = 'none';
+        });
+    </script>
+</body>
+</html> 

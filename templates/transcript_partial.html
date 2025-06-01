@@ -1,0 +1,95 @@
+{% if result %}
+<div class="video-info">
+    <h2>{{ result.video_title }}</h2>
+    <p class="mb-1"><strong>Duration:</strong> {{ result.duration }}</p>
+    <p class="mb-1"><strong>URL:</strong> <a href="{{ result.video_url }}" target="_blank">{{ result.video_url }}</a></p>
+    <p class="mb-0"><strong>Number of chunks:</strong> {{ result.chunks|length }}</p>
+</div>
+
+<div class="transcript-controls">
+    <div class="flex-grow-1">
+        <input type="text" id="searchInput" class="form-control" placeholder="Search in transcript...">
+    </div>
+    <div class="font-size-control">
+        <button class="btn btn-outline-secondary btn-sm" onclick="changeFontSize(-1)">A-</button>
+        <button class="btn btn-outline-secondary btn-sm" onclick="changeFontSize(1)">A+</button>
+    </div>
+</div>
+
+<ul class="nav nav-tabs" id="viewTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="full-tab" data-bs-toggle="tab" data-bs-target="#full" type="button" role="tab">Full Transcript</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="chunked-tab" data-bs-toggle="tab" data-bs-target="#chunked" type="button" role="tab">Time-based Chunks</button>
+    </li>
+</ul>
+
+<div class="tab-content" id="viewTabsContent">
+    <div class="tab-pane fade show active" id="full" role="tabpanel">
+        <div class="full-transcript">
+            <h3>Full Transcript</h3>
+            <div class="transcript-text" id="fullTranscript">
+                {{ result.full_transcript }}
+            </div>
+        </div>
+    </div>
+    <div class="tab-pane fade" id="chunked" role="tabpanel">
+        <div class="chunked-transcript">
+            <h3>Time-based Chunks</h3>
+            <div id="transcriptContainer">
+                {% for chunk in result.chunks %}
+                <div class="chunk" data-text="{{ chunk.text|lower }}">
+                    <div class="timestamp">
+                        [{{ chunk.start_time }} - {{ chunk.end_time }}]
+                    </div>
+                    <div class="transcript-text">
+                        {{ chunk.text }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+<script>
+// Re-attach search and font size logic after AJAX update
+let currentFontSize = 1.1;
+function changeFontSize(delta) {
+    currentFontSize = Math.max(0.8, Math.min(1.5, currentFontSize + delta * 0.1));
+    document.querySelector('.full-transcript .transcript-text').style.fontSize = `${currentFontSize}rem`;
+}
+document.getElementById('searchInput').addEventListener('input', function(e) {
+    const searchText = e.target.value.toLowerCase();
+    const chunks = document.querySelectorAll('.chunk');
+    const fullTranscript = document.getElementById('fullTranscript');
+    // Search in chunks
+    chunks.forEach(chunk => {
+        const text = chunk.getAttribute('data-text');
+        if (text.includes(searchText)) {
+            chunk.style.display = 'block';
+            if (searchText) {
+                const regex = new RegExp(searchText, 'gi');
+                chunk.innerHTML = chunk.innerHTML.replace(regex, match => `<mark>${match}</mark>`);
+            }
+        } else {
+            chunk.style.display = 'none';
+        }
+    });
+    // Search in full transcript
+    if (searchText) {
+        const text = fullTranscript.textContent;
+        const regex = new RegExp(searchText, 'gi');
+        fullTranscript.innerHTML = text.replace(regex, match => `<mark>${match}</mark>`);
+    } else {
+        fullTranscript.innerHTML = fullTranscript.textContent;
+    }
+});
+document.getElementById('chunked-tab').addEventListener('click', function() {
+    document.querySelector('.chunked-transcript').style.display = 'block';
+});
+document.getElementById('full-tab').addEventListener('click', function() {
+    document.querySelector('.chunked-transcript').style.display = 'none';
+});
+</script> 
