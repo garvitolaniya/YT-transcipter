@@ -1,5 +1,5 @@
 from youtube_transcript_api import YouTubeTranscriptApi
-from googletrans import Translator
+from deep_translator import GoogleTranslator
 import yt_dlp
 import re
 import json
@@ -14,7 +14,7 @@ app = Flask(__name__)
 
 class YouTubeTranscriber:
     def __init__(self):
-        self.translator = Translator()
+        self.translator = GoogleTranslator(source='auto', target='en')
         # List of common user agents
         self.user_agents = [
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
